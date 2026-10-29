@@ -7,7 +7,7 @@ _Last updated: 2026-10-29 — Phase 6 (Deployment) prepared and verified locally
 | Tool                | Status                                                                                   |
 | ------------------- | ---------------------------------------------------------------------------------------- |
 | Node.js / npm       | v24.19.0 / 11.17.0                                                                       |
-| Git                 | **Not installed / not on PATH** — repository not initialised, nothing committed          |
+| Git                 | PortableGit 2.56.0.4 (not on PATH); remote: private `afsararavedu/kirana-voice-billing`  |
 | Docker              | **Not installed** — Compose work deferred to Phase 6 (VPS)                               |
 | PostgreSQL          | **Not installed** — local dev/test use `embedded-postgres` (real PostgreSQL 17 binaries) |
 | Playwright Chromium | Installed via `npx playwright install chromium`                                          |
@@ -15,6 +15,20 @@ _Last updated: 2026-10-29 — Phase 6 (Deployment) prepared and verified locally
 npm 11 blocks dependency install scripts by default. Approved (recorded in root `package.json` →
 `allowScripts`): `prisma`, `@prisma/client`, `@prisma/engines`, `esbuild`,
 `@embedded-postgres/windows-x64`.
+
+## Branding (Waycup Chai), 2026-10-29
+
+- Every page (shared `Layout`) has a footer: "© {year} Waycup Chai. All rights reserved.", a link to
+  https://waycupchai.com and "Developed by ARM Gen Alpha Technologies", translated in en/hi/te/ur
+  (brand names kept in Latin script, isolated left-to-right inside Urdu). Hidden when printing, so
+  receipts are unchanged.
+- Logos from the owner's artwork in `apps/web/public/`: round logo in the header and as the
+  favicon / home-screen icon, wordmark on the sign-in and create-account pages.
+- Not used: the banner and pack-label artwork (marketing content with phone numbers and prices),
+  and the SBI UPI QR photo (a photo of the card is not reliably scannable, and one fixed QR would
+  send every store's payments to the same account).
+- Verified: `SiteFooter.test.tsx` (4 languages), web 31/31, e2e 20/20, lint, format, build; checked
+  in the browser at desktop and 375 px width in English and Urdu.
 
 ## Phase 6 — deployment prepared (VPS deploy not yet run)
 

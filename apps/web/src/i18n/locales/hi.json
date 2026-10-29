@@ -2,6 +2,10 @@
   "app": {
     "title": "किराना वॉइस बिलिंग"
   },
+  "footer": {
+    "copyright": "{{notice}}. सर्वाधिकार सुरक्षित।",
+    "developedBy": "{{name}} द्वारा विकसित"
+  },
   "nav": {
     "stores": "दुकानें",
     "settings": "सेटिंग्स",

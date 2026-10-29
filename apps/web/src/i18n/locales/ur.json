@@ -2,6 +2,10 @@
   "app": {
     "title": "کریانہ وائس بلنگ"
   },
+  "footer": {
+    "copyright": "{{notice}}۔ جملہ حقوق محفوظ ہیں۔",
+    "developedBy": "تیار کردہ: {{name}}"
+  },
   "nav": {
     "stores": "دکانیں",
     "settings": "ترتیبات",

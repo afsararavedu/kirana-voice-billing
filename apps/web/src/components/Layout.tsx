@@ -12,6 +12,7 @@ export function Layout() {
     <div className="shell">
       <header className="topbar no-print">
         <Link to="/" className="brand">
+          <img src="/brand/waycup-logo.png" alt="" width={36} height={36} className="brand-logo" />
           {t('app.title')}
         </Link>
         {user && (
@@ -39,7 +40,27 @@ export function Layout() {
       <main className="content">
         <Outlet />
       </main>
+      <SiteFooter />
     </div>
+  );
+}
+
+// Left-to-right isolate (LRI … PDI): keeps "© 2026 Waycup Chai" in order inside Urdu (RTL) text.
+const ltr = (s: string) => String.fromCharCode(0x2066) + s + String.fromCharCode(0x2069);
+
+/** Brand names stay in Latin script in every language; only the surrounding words are translated. */
+export function SiteFooter() {
+  const { t } = useTranslation();
+  return (
+    <footer className="site-footer no-print">
+      <p>
+        {t('footer.copyright', { notice: ltr(`© ${new Date().getFullYear()} Waycup Chai`) })}{' '}
+        <a href="https://waycupchai.com" target="_blank" rel="noopener noreferrer" dir="ltr">
+          waycupchai.com
+        </a>
+      </p>
+      <p>{t('footer.developedBy', { name: ltr('ARM Gen Alpha Technologies') })}</p>
+    </footer>
   );
 }
 

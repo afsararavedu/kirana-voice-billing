@@ -10,6 +10,9 @@
   --danger: #b42318;
   --warn: #b54708;
   --radius: 10px;
+  /* Waycup Chai brand colours (from its logo); the same in light and dark mode. */
+  --brand-maroon: #511417;
+  --brand-orange: #f7941d;
   color-scheme: light;
   font-family:
     'Noto Sans',
@@ -67,10 +70,24 @@ body {
   border-block-end: 1px solid var(--border);
 }
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-weight: 600;
   color: var(--accent);
   text-decoration: none;
   font-size: 1.1rem;
+}
+.brand-logo {
+  border-radius: 50%;
+  flex: none;
+}
+.brand-banner {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  border-radius: 8px;
+  margin-block-end: 16px;
 }
 .nav {
   display: flex;
@@ -96,10 +113,36 @@ body {
   gap: 8px;
 }
 
+/* Footer stays at the bottom of the window on short pages. */
+.shell {
+  min-block-size: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 .content {
+  inline-size: 100%;
   max-width: 960px;
   margin-inline: auto;
   padding: 24px 16px;
+  flex: 1 0 auto;
+}
+.site-footer {
+  background: var(--brand-maroon);
+  color: #fff;
+  text-align: center;
+  font-size: 0.9rem;
+  padding-block: 14px;
+  padding-inline: 16px;
+}
+.site-footer p {
+  margin: 0;
+}
+.site-footer a {
+  color: var(--brand-orange);
+  font-weight: 600;
+}
+.site-footer a:focus-visible {
+  outline-color: var(--brand-orange);
 }
 .stack {
   display: grid;

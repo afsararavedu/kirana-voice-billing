@@ -2,6 +2,10 @@
   "app": {
     "title": "Kirana Voice Billing"
   },
+  "footer": {
+    "copyright": "{{notice}}. All rights reserved.",
+    "developedBy": "Developed by {{name}}"
+  },
   "nav": {
     "stores": "Stores",
     "settings": "Settings",

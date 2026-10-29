@@ -23,6 +23,18 @@ function useSubmit(action: (form: FormData) => Promise<void>) {
   return { error, busy, onSubmit };
 }
 
+function BrandBanner() {
+  return (
+    <img
+      src="/brand/waycup-wordmark.png"
+      alt="Waycup Chai"
+      width={520}
+      height={208}
+      className="brand-banner"
+    />
+  );
+}
+
 export function LoginPage() {
   const { t } = useTranslation();
   const { user, login } = useAuth();
@@ -35,6 +47,7 @@ export function LoginPage() {
 
   return (
     <section className="card narrow">
+      <BrandBanner />
       <h1>{t('auth.loginTitle')}</h1>
       <form onSubmit={onSubmit} className="form">
         <label>
@@ -74,6 +87,7 @@ export function RegisterPage() {
 
   return (
     <section className="card narrow">
+      <BrandBanner />
       <h1>{t('auth.registerTitle')}</h1>
       <form onSubmit={onSubmit} className="form">
         <label>
