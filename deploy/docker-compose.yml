@@ -1,0 +1,106 @@
+# Production stack for one VPS. Run from the deploy/ directory with deploy/.env present:
+#   ./scripts/deploy.sh            (backup → build → migrate → start; see docs/deployment.md)
+# Secrets come only from deploy/.env (never committed). Only Caddy publishes ports.
+name: kirana
+
+x-api-image: &api-image
+  image: kirana-api:${RELEASE:-latest}
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile.api
+
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kirana
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set in deploy/.env}
+      # UTF-8 is required for Telugu/Hindi/Urdu text.
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C.UTF-8
+      # Read once by postgres/init/10-roles.sh on first start of an empty volume.
+      KIRANA_OWNER_PASSWORD: ${KIRANA_OWNER_PASSWORD:?set in deploy/.env}
+      KIRANA_APP_PASSWORD: ${KIRANA_APP_PASSWORD:?set in deploy/.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./postgres/roles.sql:/kirana/roles.sql:ro
+      - ./postgres/grants.sql:/kirana/grants.sql:ro
+      - ${BACKUP_DIR:-/var/backups/kirana}:/backups
+    shm_size: 128mb
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d kirana']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [backend]
+
+  # One-off: `docker compose --profile migrate run --rm migrate` (deploy.sh does this after a
+  # verified backup). Runs as the schema owner; the API itself cannot change the schema.
+  migrate:
+    <<: *api-image
+    profiles: [migrate]
+    restart: 'no'
+    environment:
+      DATABASE_URL: postgresql://kirana_owner:${KIRANA_OWNER_PASSWORD}@db:5432/kirana?schema=public
+    command: ['npx', 'prisma', 'migrate', 'deploy']
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [backend]
+
+  api:
+    <<: *api-image
+    restart: unless-stopped
+    # App settings only (voice providers, rate limits). Database passwords stay in deploy/.env,
+    # which the API container never sees except for its own DATABASE_URL below.
+    env_file: api.env
+    environment:
+      NODE_ENV: production
+      PORT: '4000'
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Least-privilege role: read/write data only, no DDL, no UPDATE/DELETE on history tables.
+      DATABASE_URL: postgresql://kirana_app:${KIRANA_APP_PASSWORD}@db:5432/kirana?schema=public&connection_limit=10
+      WEB_ORIGINS: https://${DOMAIN:?set in deploy/.env}
+      COOKIE_SECURE: 'true'
+      # Exactly one proxy (Caddy) in front: rate limits see the real client IP.
+      TRUST_PROXY: '1'
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ['no-new-privileges:true']
+    depends_on:
+      db:
+        condition: service_healthy
+    # backend: database (no internet). frontend: Caddy, and outbound HTTPS for the optional
+    # Claude extractor.
+    networks: [backend, frontend]
+
+  web:
+    image: kirana-web:${RELEASE:-latest}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?set in deploy/.env}
+      ACME_EMAIL: ${ACME_EMAIL:?set in deploy/.env}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+    networks: [frontend]
+
+networks:
+  backend:
+    internal: true
+  frontend: {}
+
+volumes:
+  pgdata: {}
+  caddy_data: {}
+  caddy_config: {}

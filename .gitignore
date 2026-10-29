@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Env — never commit real values; .env.example holds placeholders
+.env
+.env.*
+!.env.example
+deploy/api.env
+
+# Build / test output
+dist/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# Local embedded PostgreSQL data directories
+.pgdata*/
+
+# Recordings and exports must never be committed
+recordings/
+*.wav
+*.webm
+*.ogg
+
+# Logs / OS / editor
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

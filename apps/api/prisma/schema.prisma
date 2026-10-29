@@ -1,0 +1,405 @@
+// Kirana Voice Billing — Phase 1 schema: identity, tenancy, sessions, audit.
+// Monetary columns (Phase 2+) must use Decimal @db.Decimal(p, s), never Float.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UiLanguage {
+  en
+  hi
+  te
+  ur
+}
+
+enum StoreRole {
+  OWNER
+  MANAGER
+  CASHIER
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique @db.VarChar(254)
+  passwordHash String     @db.VarChar(255)
+  displayName  String     @db.VarChar(80)
+  uiLanguage   UiLanguage @default(en)
+  /// BCP-47 locale for speech input, independent of UI language (validated in @kirana/shared).
+  speechLocale String     @default("en-IN") @db.VarChar(16)
+  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime   @updatedAt @db.Timestamptz(3)
+
+  memberships        StoreMembership[]
+  sessions           Session[]
+  auditLogs          AuditLog[]
+  inventoryMovements InventoryMovement[]
+  sales              Sale[]
+  saleReturns        SaleReturn[]
+}
+
+/// A tenant. Every store-owned record in later phases carries storeId.
+model Store {
+  id              String     @id @default(uuid()) @db.Uuid
+  name            String     @db.VarChar(120)
+  currency        String     @default("INR") @db.Char(3)
+  /// Language receipts are printed in, independent of any user's UI language.
+  receiptLanguage UiLanguage @default(en)
+  /// Next bill number for this store; allocated under row lock inside the sale transaction.
+  nextSaleNumber  Int        @default(1)
+  /// Phase 4: seller details for receipts (snapshotted onto each sale).
+  address         String?    @db.VarChar(300)
+  phone           String?    @db.VarChar(20)
+  /// Set → receipts are GST tax invoices.
+  gstin           String?    @db.Char(15)
+  /// Invoice number prefix, e.g. "LK" → LK/26-27/1. Changeable only before the year's first bill.
+  invoicePrefix   String?    @db.VarChar(4)
+  receiptFooter   String?    @db.VarChar(200)
+  createdAt       DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime   @updatedAt @db.Timestamptz(3)
+
+  memberships        StoreMembership[]
+  invoiceCounters    InvoiceCounter[]
+  auditLogs          AuditLog[]
+  products           Product[]
+  productAliases     ProductAlias[]
+  inventoryMovements InventoryMovement[]
+  idempotencyKeys    IdempotencyKey[]
+  sales              Sale[]
+  saleItems          SaleItem[]
+  salePayments       SalePayment[]
+  saleReturns        SaleReturn[]
+  saleReturnItems    SaleReturnItem[]
+}
+
+/// Server-side source of truth for tenant permissions.
+model StoreMembership {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  storeId   String    @db.Uuid
+  role      StoreRole
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store Store @relation(fields: [storeId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, storeId])
+  @@index([storeId])
+}
+
+/// Opaque session; only a SHA-256 hash of the cookie token is stored.
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  tokenHash  String   @unique @db.Char(64)
+  userId     String   @db.Uuid
+  expiresAt  DateTime @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  lastSeenAt DateTime @default(now()) @db.Timestamptz(3)
+  userAgent  String?  @db.VarChar(255)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Append-only record of important changes. Never updated or deleted by the app.
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  storeId     String?  @db.Uuid
+  actorUserId String?  @db.Uuid
+  action      String   @db.VarChar(64)
+  entityType  String   @db.VarChar(64)
+  entityId    String?  @db.VarChar(64)
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  store Store? @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  actor User?  @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, createdAt])
+}
+
+// ===== Phase 2: catalog & inventory =====
+
+/// Units a product is sold and stocked in. Fractional quantities only for weight/volume.
+enum UnitOfMeasure {
+  KG
+  G
+  L
+  ML
+  PIECE
+  PACK
+  DOZEN
+}
+
+enum MovementType {
+  OPENING
+  RECEIVE
+  ADJUST
+  /// Physical count; balanceAfter is the counted quantity.
+  COUNT
+  DAMAGE
+  EXPIRY
+  /// Phase 3: stock leaving with a finalised sale.
+  SALE
+  /// Phase 3: returned goods put back on the shelf.
+  RETURN
+}
+
+model Product {
+  id                String        @id @default(uuid()) @db.Uuid
+  storeId           String        @db.Uuid
+  /// Canonical display name (usually what the owner types first).
+  name              String        @db.VarChar(120)
+  /// Optional per-language display names for receipts: { "hi": "...", "te": "...", "ur": "..." }.
+  localNames        Json          @default("{}")
+  sku               String?       @db.VarChar(64)
+  unit              UnitOfMeasure
+  /// Selling price per one `unit`, in store currency.
+  sellingPrice      Decimal       @db.Decimal(12, 2)
+  /// GST rate in percent, e.g. 5.00.
+  taxRate           Decimal       @default(0) @db.Decimal(5, 2)
+  /// Indian retail prices (MRP) are usually tax-inclusive.
+  priceIncludesTax  Boolean       @default(true)
+  /// Cached balance; the InventoryMovement ledger is authoritative. Updated only under row lock.
+  stockQuantity     Decimal       @default(0) @db.Decimal(12, 3)
+  lowStockThreshold Decimal?      @db.Decimal(12, 3)
+  /// Products are archived, never deleted, so sale history keeps its references.
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime      @updatedAt @db.Timestamptz(3)
+
+  store     Store               @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  aliases   ProductAlias[]
+  movements InventoryMovement[]
+  saleItems SaleItem[]
+
+  @@unique([storeId, sku])
+  @@unique([storeId, id])
+  @@index([storeId, isActive, name])
+}
+
+/// Searchable names (canonical, local names and spoken aliases), normalised for matching.
+/// Not unique: two products may share an alias — voice billing must then ask for clarification.
+model ProductAlias {
+  id         String      @id @default(uuid()) @db.Uuid
+  storeId    String      @db.Uuid
+  productId  String      @db.Uuid
+  language   UiLanguage?
+  text       String      @db.VarChar(120)
+  normalized String      @db.VarChar(120)
+  /// Preserves the order names were entered in.
+  position   Int         @default(0) @db.SmallInt
+
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [storeId, productId], references: [storeId, id], onDelete: Cascade)
+
+  @@unique([productId, normalized])
+  @@index([storeId, normalized])
+}
+
+/// Append-only stock ledger (UPDATE/DELETE blocked by DB trigger). Sum of quantityDelta = stock.
+model InventoryMovement {
+  id            String       @id @default(uuid()) @db.Uuid
+  /// Monotonic ordering within the whole table.
+  seq           BigInt       @default(autoincrement())
+  storeId       String       @db.Uuid
+  productId     String       @db.Uuid
+  type          MovementType
+  /// Signed change in the product's unit. Never zero.
+  quantityDelta Decimal      @db.Decimal(12, 3)
+  balanceAfter  Decimal      @db.Decimal(12, 3)
+  note          String?      @db.VarChar(255)
+  actorUserId   String?      @db.Uuid
+  /// Set for SALE movements.
+  saleId        String?      @db.Uuid
+  /// Set for RETURN movements.
+  saleReturnId  String?      @db.Uuid
+  createdAt     DateTime     @default(now()) @db.Timestamptz(3)
+
+  store      Store       @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  product    Product     @relation(fields: [storeId, productId], references: [storeId, id], onDelete: Restrict)
+  actor      User?       @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  sale       Sale?       @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  saleReturn SaleReturn? @relation(fields: [saleReturnId], references: [id], onDelete: Restrict)
+
+  @@unique([seq])
+  @@index([storeId, productId, seq])
+  @@index([saleId])
+}
+
+// ===== Phase 3: billing =====
+// Every table below is append-only (DB triggers). A sale is never edited: returns are separate
+// records and the sale's status is derived from them.
+
+enum SaleSource {
+  MANUAL
+  VOICE
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+}
+
+model Sale {
+  id              String     @id @default(uuid()) @db.Uuid
+  storeId         String     @db.Uuid
+  /// Per-store sequential bill number (1, 2, 3, ...), gap-free because it is allocated in-transaction.
+  number          Int
+  /// Phase 4: Indian financial year (start year, IST) and the consecutive invoice serial within it.
+  fiscalYear      Int
+  invoiceSeq      Int
+  /// e.g. "LK/26-27/123" — at most 16 characters (GST rule 46).
+  invoiceNumber   String     @db.VarChar(16)
+  /// Store name/address/phone/GSTIN/footer when the bill was made, so reprints never change.
+  seller          Json
+  source          SaleSource @default(MANUAL)
+  /// Sum of line taxable values (after discounts, excluding GST).
+  taxableTotal    Decimal    @db.Decimal(12, 2)
+  taxTotal        Decimal    @db.Decimal(12, 2)
+  discountTotal   Decimal    @db.Decimal(12, 2)
+  /// Amount the customer pays: taxableTotal + taxTotal.
+  grandTotal      Decimal    @db.Decimal(12, 2)
+  /// Snapshot of the store's receipt language when the sale was made.
+  receiptLanguage UiLanguage
+  createdById     String     @db.Uuid
+  createdAt       DateTime   @default(now()) @db.Timestamptz(3)
+
+  store     Store               @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  createdBy User                @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  items     SaleItem[]
+  payments  SalePayment[]
+  returns   SaleReturn[]
+  movements InventoryMovement[]
+
+  @@unique([storeId, number])
+  @@unique([storeId, id])
+  @@unique([storeId, fiscalYear, invoiceSeq])
+  @@unique([storeId, invoiceNumber])
+  @@index([storeId, createdAt])
+}
+
+/// Next invoice serial per store per financial year. Allocated while the Store row is locked.
+model InvoiceCounter {
+  storeId    String @db.Uuid
+  fiscalYear Int
+  nextSeq    Int
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Restrict)
+
+  @@id([storeId, fiscalYear])
+}
+
+/// Snapshot of the product as sold: later catalog edits never change a past bill.
+model SaleItem {
+  id               String        @id @default(uuid()) @db.Uuid
+  storeId          String        @db.Uuid
+  saleId           String        @db.Uuid
+  productId        String        @db.Uuid
+  lineNo           Int           @db.SmallInt
+  productName      String        @db.VarChar(120)
+  /// Display names at time of sale, for receipts in the store's receipt language.
+  localNames       Json          @default("{}")
+  unit             UnitOfMeasure
+  quantity         Decimal       @db.Decimal(12, 3)
+  unitPrice        Decimal       @db.Decimal(12, 2)
+  priceIncludesTax Boolean
+  taxRate          Decimal       @db.Decimal(5, 2)
+  /// quantity x unitPrice, rounded half-up to the paisa.
+  grossAmount      Decimal       @db.Decimal(12, 2)
+  discountAmount   Decimal       @db.Decimal(12, 2)
+  taxableValue     Decimal       @db.Decimal(12, 2)
+  taxAmount        Decimal       @db.Decimal(12, 2)
+  lineTotal        Decimal       @db.Decimal(12, 2)
+
+  store       Store            @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  sale        Sale             @relation(fields: [storeId, saleId], references: [storeId, id], onDelete: Restrict)
+  product     Product          @relation(fields: [storeId, productId], references: [storeId, id], onDelete: Restrict)
+  returnItems SaleReturnItem[]
+
+  @@unique([saleId, lineNo])
+  @@unique([saleId, id])
+  @@index([storeId, productId])
+}
+
+model SalePayment {
+  id        String        @id @default(uuid()) @db.Uuid
+  storeId   String        @db.Uuid
+  saleId    String        @db.Uuid
+  method    PaymentMethod
+  /// Amount applied to the bill.
+  amount    Decimal       @db.Decimal(12, 2)
+  /// Cash handed over (CASH only); change = tendered - amount.
+  tendered  Decimal?      @db.Decimal(12, 2)
+  createdAt DateTime      @default(now()) @db.Timestamptz(3)
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  sale  Sale  @relation(fields: [storeId, saleId], references: [storeId, id], onDelete: Restrict)
+
+  @@index([saleId])
+}
+
+/// A return (partial or full) against one sale, with its refund. Cancelling a bill = returning everything.
+model SaleReturn {
+  id           String        @id @default(uuid()) @db.Uuid
+  storeId      String        @db.Uuid
+  saleId       String        @db.Uuid
+  reason       String        @db.VarChar(255)
+  /// Whether returned goods went back into stock.
+  restocked    Boolean
+  refundMethod PaymentMethod
+  refundTotal  Decimal       @db.Decimal(12, 2)
+  taxRefunded  Decimal       @db.Decimal(12, 2)
+  createdById  String        @db.Uuid
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+
+  store     Store               @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  sale      Sale                @relation(fields: [storeId, saleId], references: [storeId, id], onDelete: Restrict)
+  createdBy User                @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  items     SaleReturnItem[]
+  movements InventoryMovement[]
+
+  @@index([saleId])
+}
+
+model SaleReturnItem {
+  id           String  @id @default(uuid()) @db.Uuid
+  storeId      String  @db.Uuid
+  saleReturnId String  @db.Uuid
+  saleId       String  @db.Uuid
+  saleItemId   String  @db.Uuid
+  quantity     Decimal @db.Decimal(12, 3)
+  refundAmount Decimal @db.Decimal(12, 2)
+  taxRefunded  Decimal @db.Decimal(12, 2)
+
+  store      Store      @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Restrict)
+  /// Composite FK: the returned line must belong to the same sale as the return.
+  saleItem   SaleItem   @relation(fields: [saleId, saleItemId], references: [saleId, id], onDelete: Restrict)
+
+  @@index([saleItemId])
+}
+
+/// Stored responses for retried writes (stock movements now, sale finalisation in Phase 3).
+model IdempotencyKey {
+  id             String   @id @default(uuid()) @db.Uuid
+  storeId        String   @db.Uuid
+  scope          String   @db.VarChar(64)
+  key            String   @db.VarChar(128)
+  requestHash    String   @db.Char(64)
+  responseStatus Int
+  responseBody   Json
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Restrict)
+
+  @@unique([storeId, scope, key])
+  @@index([createdAt])
+}

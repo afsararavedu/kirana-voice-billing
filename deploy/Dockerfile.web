@@ -1,0 +1,20 @@
+# Web image: the built React app served by Caddy, which also terminates HTTPS and proxies /api.
+# Build context is the repository root.
+
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/web/package.json apps/web/
+COPY apps/api/package.json apps/api/
+# The web build needs no Prisma; skip dependency install scripts (the API's `prisma generate`).
+RUN npm ci --no-audit --no-fund --ignore-scripts
+COPY tsconfig.base.json ./
+COPY packages/shared packages/shared
+COPY apps/web apps/web
+# Includes the bundle check: fails if any provider key or provider URL reached the browser bundle.
+RUN npm run build -w @kirana/shared && npm run build -w @kirana/web
+
+FROM caddy:2.10-alpine
+COPY deploy/Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/apps/web/dist /srv

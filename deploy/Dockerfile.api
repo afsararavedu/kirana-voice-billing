@@ -1,0 +1,39 @@
+# API image: Node 24 on Debian bookworm (glibc + OpenSSL 3 for Prisma's engines). Build context is
+# the repository root: `docker compose -f deploy/docker-compose.yml build`.
+
+FROM node:24-bookworm-slim AS build
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+# Manifests first so dependency installs are cached; the Prisma schema is needed by the API's
+# postinstall (`prisma generate`).
+COPY package.json package-lock.json ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/web/package.json apps/web/
+COPY apps/api/package.json apps/api/
+COPY apps/api/prisma apps/api/prisma
+RUN npm ci --no-audit --no-fund
+COPY tsconfig.base.json ./
+COPY packages/shared packages/shared
+COPY apps/api apps/api
+RUN npm run build -w @kirana/shared \
+  && npm run build -w @kirana/api \
+  && npm prune --omit=dev --no-audit --no-fund \
+  && npx -w @kirana/api prisma generate \
+  && rm -rf apps/web apps/api/src apps/api/test apps/api/scripts packages/shared/src
+
+FROM node:24-bookworm-slim AS runtime
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates tini \
+  && rm -rf /var/lib/apt/lists/*
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build --chown=node:node /app /app
+USER node
+WORKDIR /app/apps/api
+EXPOSE 4000
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:4000/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "dist/server.js"]

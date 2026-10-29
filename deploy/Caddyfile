@@ -1,0 +1,51 @@
+# Caddy: automatic HTTPS (Let's Encrypt) for {$DOMAIN}, the web app as static files, /api/* proxied
+# to the API container. DOMAIN and ACME_EMAIL come from deploy/.env via docker-compose.
+{
+	email {$ACME_EMAIL}
+	# Admin API only inside the container.
+	admin localhost:2019
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		# The microphone is needed by voice billing on this origin only.
+		Permissions-Policy "microphone=(self), camera=(), geolocation=(), payment=()"
+		-Server
+	}
+
+	# The CSV import is the largest request (2 MB in the API); keep a little headroom.
+	request_body {
+		max_size 3MB
+	}
+
+	handle /api/* {
+		reverse_proxy api:4000 {
+			health_uri /api/v1/health
+			health_interval 30s
+		}
+	}
+
+	handle {
+		root * /srv
+		# Vite's hashed assets never change: cache for a year. index.html is always revalidated.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@html not path /assets/*
+		header @html Cache-Control "no-cache"
+		# Fonts come from Google Fonts; scripts and API calls only from this origin.
+		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		try_files {path} /index.html
+		file_server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

@@ -1,0 +1,653 @@
+/* Logical properties (inline/block) throughout so Urdu RTL mirrors without per-direction overrides. */
+:root {
+  --bg: #f6f7f5;
+  --surface: #ffffff;
+  --text: #1c2321;
+  --muted: #5b6662;
+  --border: #d9dedb;
+  --accent: #0f766e;
+  --accent-text: #ffffff;
+  --danger: #b42318;
+  --warn: #b54708;
+  --radius: 10px;
+  color-scheme: light;
+  font-family:
+    'Noto Sans',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  line-height: 1.5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121615;
+    --surface: #1b2120;
+    --text: #e6ebe9;
+    --muted: #9aa6a1;
+    --border: #2f3836;
+    --accent: #2dd4bf;
+    --accent-text: #062b27;
+    --danger: #f97066;
+    --warn: #fdb022;
+    color-scheme: dark;
+  }
+}
+
+:lang(hi) {
+  font-family: 'Noto Sans Devanagari', 'Nirmala UI', 'Mangal', sans-serif;
+}
+:lang(te) {
+  font-family: 'Noto Sans Telugu', 'Nirmala UI', 'Gautami', sans-serif;
+}
+/* Nastaliq needs generous line height; fall back to Naskh-style fonts if unavailable. */
+:lang(ur) {
+  font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Urdu Typesetting', 'Segoe UI', serif;
+  line-height: 2.1;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding-block: 12px;
+  padding-inline: 16px;
+  background: var(--surface);
+  border-block-end: 1px solid var(--border);
+}
+.brand {
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 1.1rem;
+}
+.nav {
+  display: flex;
+  gap: 16px;
+}
+.nav a {
+  color: var(--text);
+  text-decoration: none;
+  padding-block: 4px;
+}
+.nav a.active {
+  border-block-end: 2px solid var(--accent);
+}
+.topbar-end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-inline-start: auto;
+}
+.lang-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.content {
+  max-width: 960px;
+  margin-inline: auto;
+  padding: 24px 16px;
+}
+.stack {
+  display: grid;
+  /* minmax(0, 1fr): grid items otherwise grow to their widest table and push the page past the
+     phone's width (the browser then zooms out), defeating .table-wrap's horizontal scroll. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.card.narrow {
+  max-width: 420px;
+  margin-inline: auto;
+}
+h1 {
+  font-size: 1.5rem;
+  margin-block: 0 16px;
+}
+h2 {
+  font-size: 1.15rem;
+  margin-block: 0 12px;
+}
+
+.form {
+  display: grid;
+  gap: 14px;
+}
+.form.inline {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+@media (max-width: 520px) {
+  .form.inline {
+    grid-template-columns: 1fr;
+  }
+}
+label,
+.field {
+  display: grid;
+  gap: 6px;
+  font-weight: 500;
+}
+small,
+.muted {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  min-height: 44px; /* touch target */
+  padding-inline: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+button {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: transparent;
+  cursor: pointer;
+  font-weight: 600;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.error {
+  color: var(--danger);
+  margin: 0;
+}
+a {
+  color: var(--accent);
+}
+
+.store-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.store-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.store-name {
+  font-weight: 600;
+  flex: 1;
+}
+.badge {
+  font-size: 0.85rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding-inline: 10px;
+  margin-inline-start: 8px;
+  white-space: nowrap;
+}
+.badge.warn {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+/* Links styled as buttons */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 16px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+a.btn.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-block-end: 16px;
+}
+.page-head h1 {
+  margin: 0;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px 20px;
+  margin-block-end: 16px;
+}
+.grow {
+  flex: 1 1 240px;
+}
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+}
+label.check input {
+  min-height: auto;
+  inline-size: 20px;
+  block-size: 20px;
+}
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.table-wrap {
+  overflow-x: auto; /* the table scrolls, never the page */
+  position: relative; /* keeps absolutely positioned children (e.g. .visually-hidden) inside */
+}
+.table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+.table th,
+.table td {
+  text-align: start;
+  padding-block: 10px;
+  padding-inline: 8px;
+  border-block-end: 1px solid var(--border);
+  vertical-align: top;
+}
+.table th {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.table .num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 24px;
+  margin: 0;
+}
+.facts dt {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.facts dd {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+/* Billing counter */
+.pick-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: grid;
+  gap: 6px;
+}
+.pick {
+  inline-size: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  justify-content: space-between;
+  text-align: start;
+  font-weight: 500;
+}
+input.qty {
+  inline-size: 6.5em;
+}
+.btn-ghost.icon {
+  min-inline-size: 44px;
+  padding-inline: 0;
+  font-size: 1.3rem;
+}
+/* On phones each cart line becomes a small card: name, then qty | discount, then amount | remove. */
+@media (max-width: 560px) {
+  .table.cart thead {
+    display: none;
+  }
+  .table.cart,
+  .table.cart tbody {
+    display: block;
+  }
+  .table.cart tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px 12px;
+    padding-block: 12px;
+    border-block-end: 1px solid var(--border);
+  }
+  .table.cart td {
+    border: 0;
+    padding: 0;
+  }
+  .table.cart td:first-child {
+    grid-column: 1 / -1;
+  }
+  .table.cart td.num {
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-align: start;
+  }
+}
+.totals {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 16px;
+  max-inline-size: 360px;
+  margin-inline-start: auto;
+}
+.totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.totals dt {
+  color: var(--muted);
+}
+.totals dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.totals .grand {
+  border-block-start: 1px solid var(--border);
+  padding-block-start: 8px;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+.totals .grand dt {
+  color: var(--text);
+}
+.pay legend {
+  font-weight: 500;
+  margin-block-end: 6px;
+}
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-end: 12px;
+}
+.segmented label {
+  position: relative; /* contains the visually hidden radio */
+  display: flex;
+  align-items: center;
+  min-block-size: 44px;
+  padding-inline: 18px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.segmented label.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.segmented label:has(input:focus-visible) {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.change {
+  align-self: end;
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0;
+}
+button.big {
+  min-block-size: 52px;
+  padding-inline: 24px;
+  font-size: 1.1rem;
+}
+.warn-text {
+  color: var(--warn);
+  font-weight: 500;
+}
+ul.plain {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 6px;
+}
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Voice billing */
+textarea {
+  padding-block: 10px;
+  inline-size: 100%;
+  resize: vertical;
+}
+.voice-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+.voice-lines {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+  display: grid;
+  gap: 12px;
+}
+.voice-lines > li {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.voice-lines p {
+  margin: 0;
+}
+.voice-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.voice-pick > label:not(.check) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.audit-details {
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+/* Receipt: sized for 80 mm thermal paper, readable on screen too. Always black on white. */
+.receipt {
+  inline-size: 100%;
+  max-inline-size: 380px;
+  margin-inline: auto;
+  padding: 16px;
+  background: #fff;
+  color: #000;
+  border: 1px dashed #999;
+  font-size: 0.95rem;
+}
+.receipt h2 {
+  margin: 0 0 4px;
+  font-size: 1.2rem;
+}
+.receipt p {
+  margin: 0;
+}
+.receipt-head {
+  text-align: center;
+  padding-block-end: 8px;
+  border-block-end: 1px dashed #000;
+}
+.receipt-kind {
+  margin-block-start: 6px !important;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.receipt-meta,
+.receipt-totals {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0;
+}
+.receipt-meta > div,
+.receipt-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.receipt dd {
+  margin: 0;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.receipt table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  margin-block: 6px;
+}
+.receipt th,
+.receipt td {
+  text-align: start;
+  padding-block: 3px;
+  padding-inline: 2px;
+  vertical-align: top;
+}
+.receipt thead th {
+  border-block: 1px dashed #000;
+  font-weight: 600;
+}
+.receipt .num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.receipt caption {
+  text-align: start;
+  font-weight: 600;
+  padding-block-start: 6px;
+}
+.receipt-tax {
+  font-size: 0.85rem;
+}
+.receipt-sub {
+  font-size: 0.85rem;
+}
+.receipt-totals {
+  border-block-start: 1px dashed #000;
+  padding-block-start: 6px;
+}
+.receipt-totals .grand {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.receipt-foot {
+  text-align: center;
+  border-block-start: 1px dashed #000;
+  padding-block-start: 8px;
+}
+
+@media print {
+  @page {
+    margin: 4mm;
+  }
+  .no-print {
+    display: none !important;
+  }
+  body,
+  .content {
+    background: #fff;
+    margin: 0;
+    padding: 0;
+  }
+  .receipt {
+    max-inline-size: 72mm;
+    border: 0;
+    padding: 0;
+    font-size: 10pt;
+  }
+}
+
+.code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+}

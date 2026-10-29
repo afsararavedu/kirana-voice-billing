@@ -1,0 +1,42 @@
+{
+  "name": "kirana-voice-billing",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:shared": "npm run build -w @kirana/shared",
+    "dev:db": "npm run dev:db -w @kirana/api",
+    "dev:api": "npm run dev -w @kirana/api",
+    "dev:web": "npm run dev -w @kirana/web",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run build:shared && npm run typecheck -w @kirana/api && npm run typecheck -w @kirana/web",
+    "test": "npm run build:shared && npm run test -w @kirana/shared && npm run test -w @kirana/api && npm run test -w @kirana/web",
+    "build": "npm run build:shared && npm run build -w @kirana/api && npm run build -w @kirana/web",
+    "e2e": "npm run e2e -w @kirana/web"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "eslint": "^9.36.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "typescript": "~5.9.2",
+    "typescript-eslint": "^8.44.0",
+    "yaml": "^2.9.1"
+  },
+  "allowScripts": {
+    "prisma@6.19.3": true,
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "@embedded-postgres/windows-x64@17.6.0-beta.15": true,
+    "esbuild@0.28.2": true
+  }
+}

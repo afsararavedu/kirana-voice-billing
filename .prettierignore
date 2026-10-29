@@ -1,0 +1,9 @@
+dist
+coverage
+node_modules
+playwright-report
+test-results
+.pgdata*
+package-lock.json
+apps/api/prisma/migrations
+CLAUDE.md
