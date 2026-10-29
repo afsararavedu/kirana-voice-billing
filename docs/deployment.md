@@ -1,6 +1,7 @@
 # Deployment and recovery runbook — Hostinger VPS
 
-Everything runs on one VPS with Docker Compose. Files: [`deploy/`](../deploy).
+Everything runs on one VPS with Docker Compose. Files: [`deploy/`](../deploy). Step-by-step for
+Hostinger, with every configuration variable explained: [`hostinger-guide.md`](hostinger-guide.md).
 
 ```text
  Internet ──443/80──▶ web (Caddy: HTTPS, static app, /api proxy) ──▶ api (Node, port 4000)

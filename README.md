@@ -82,4 +82,6 @@ Docker Compose stack in [`deploy/`](deploy): PostgreSQL 17, the API, and Caddy (
 static web app, `/api` proxy). Step-by-step: [`docs/deployment.md`](docs/deployment.md) —
 server preparation, `deploy/.env` + `deploy/api.env` (copied from the `.example` files; never
 committed), `scripts/vps-check.sh`, staging then production with `scripts/deploy.sh`, daily
-`scripts/backup.sh`, and the `scripts/restore.sh --drill` restore drill.
+`scripts/backup.sh`, and the `scripts/restore.sh --drill` restore drill. Click-by-click for
+Hostinger (hPanel, DNS, private GitHub repo, every configuration variable):
+[`docs/hostinger-guide.md`](docs/hostinger-guide.md).
